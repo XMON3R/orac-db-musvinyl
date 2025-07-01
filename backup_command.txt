@@ -1,0 +1,13 @@
+This command connects as the music_owner and saves the entire schema to a file named music_db.dmp.
+
+expdp music_owner/YourAppPassword@localhost:1521/FREEPDB1 DUMPFILE=music_db.dmp LOGFILE=music_export.log SCHEMAS=music_owner DIRECTORY=DATA_PUMP_DIR
+
+
+
+Recovery (Import)
+
+This command restores the schema from the backup file. The REMAP_SCHEMA option allows you to restore it to a different user, which is a common recovery scenario.
+
+# Note: The target user 'music_owner_restored' must be created first.
+impdp system/DbForMusic_2025@localhost:1521/FREEPDB1 REMAP_SCHEMA=music_owner:music_owner_restored DUMPFILE=music_db.dmp LOGFILE=music_import.log DIRECTORY=DATA_PUMP_DIR
+
