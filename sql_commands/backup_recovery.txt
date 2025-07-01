@@ -1,0 +1,16 @@
+expdp music_owner/YourAppPassword@localhost:1521/music_pdb \
+DIRECTORY=DATA_PUMP_DIR \
+DUMPFILE=music_schema.dmp \
+LOGFILE=music_export.log \
+SCHEMAS=music_owner
+
+impdp system/DbForMusic_2025@localhost:1521/music_pdb \
+DIRECTORY=DATA_PUMP_DIR \
+DUMPFILE=music_schema.dmp \
+LOGFILE=music_import.log \
+REMAP_SCHEMA=music_owner:music_owner_restored
+
+
+LEGACY:
+exp music_owner/YourAppPassword@localhost:1521/music_pdb FILE=music_schema_legacy.dmp OWNER=music_owner
+imp system/DbForMusic_2025@localhost:1521/music_pdb FILE=/music_schema_legacy.dmp FROMUSER=music_owner TOUSER=music_owner_restored
