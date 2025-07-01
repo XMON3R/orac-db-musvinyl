@@ -1,6 +1,6 @@
 Entity-Relationship Model
 
-The database will consist of 8 interrelated tables, which is an ideal number for this project's scope.
+The database consists of 8 interrelated tables, which is an ideal number for this project's scope.
 
     ARTISTS: The main table for bands or solo artists.
 

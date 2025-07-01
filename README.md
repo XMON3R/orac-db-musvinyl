@@ -51,24 +51,22 @@ In this phase, you will connect as the application owner to build the tables, pa
 
 1.  Run the following scripts in this exact order:
 
--   drop_schema.sql: Clears any old objects for a clean start.\
-    @drop_schema.sql
+-   5_drop_schema.sql: Clears any old objects for a clean start (+ 4_drop_stats.sql for stats drop).\ 
 
--   super_create_schema.sql: Creates all tables, views, indexes, packages, and triggers.\
-    @super_create_schema.sql
+-   1_create_schema.sql: Creates all tables, views, indexes, packages, and triggers.\
 
--   insert_data.sql: Populates the tables with sample data.\
-    @insert_data.sql
+-   2_insert_data.sql: Populates the tables with sample data.\
 
--   grant_privs_to_roles.sql: Grants permissions on the new objects to the application roles.\
-    @grant_privs_to_roles.sql
+-   3_generate_stats.sql: Generates stats for music_owner user.\
+
+-   7_grant_privs_to_roles.sql: Grants permissions on the new objects to the application roles.\
 
 ### Step 4: Test the Application
 
 This final step runs the test script to verify that all procedures and triggers work as expected.
 
-1.  While still connected as music_owner, run the test script:\
-    @test_functionality.sql
+1.  While still connected as music_owner, run the test script
+    6_test_functionality.sql
 
 The output will show the results of each test case, including successful operations and correctly handled errors.
 
