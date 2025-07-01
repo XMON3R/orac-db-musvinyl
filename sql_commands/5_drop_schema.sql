@@ -1,11 +1,11 @@
--- SCRIPT: drop_schema.sql
--- AUTHOR: Your Name
+-- AUTHOR: Šimon Jůza
 -- PURPOSE: To remove all objects from the music database schema.
 
 -- Drop objects in reverse order of creation to avoid dependency errors.
 
 -- Drop Triggers
-DROP TRIGGER trg_prevent_artist_deletion;
+DROP TRIGGER trg_validate_album_release_year;
+DROP TRIGGER trg_validate_artist_year;
 
 -- Drop Packages
 DROP PACKAGE album_pkg;

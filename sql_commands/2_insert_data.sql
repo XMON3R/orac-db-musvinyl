@@ -1,5 +1,5 @@
 -- SCRIPT: insert_data.sql
--- AUTHOR: Your Name
+-- AUTHOR: Šimon Jůza
 -- PURPOSE: To populate the music database with demonstration data.
 
 -- Turn on server output to see feedback messages (optional)

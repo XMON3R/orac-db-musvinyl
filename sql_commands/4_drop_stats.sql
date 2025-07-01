@@ -1,5 +1,4 @@
--- SCRIPT: drop_stats.sql
--- AUTHOR: Your Name
+-- AUTHOR: Šimon Jůza
 -- PURPOSE: To drop statistics for the music_owner schema.
 
 BEGIN
