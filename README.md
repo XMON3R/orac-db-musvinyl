@@ -74,8 +74,42 @@ The output will show the results of each test case, including successful operati
 
 These commands are run from your computer's terminal to back up and restore the schema.
 
+You must run these commands:
+```
+CREATE OR REPLACE DIRECTORY DATA_PUMP_DIR AS '/opt/oracle/oradata'; 
+```
+as SYS (connected to "FREE")
+
+&
+```
+GRANT READ, WRITE ON DIRECTORY DATA_PUMP_DIR TO music_owner;
+```
+as system (connected to "music_pdb)
+
 -   To Back Up (expdp):\
     docker exec -it musvinyl expdp music_owner/YourAppPassword@localhost:1521/music_pdb DIRECTORY=DATA_PUMP_DIR DUMPFILE=music_schema.dmp SCHEMAS=music_owner
 
-To Recover (impdp):\
+& then: docker cp musvinyl:/opt/oracle/oradata/YOUR_HEX/music_schema.dmp .
+
+
+- To Recover (impdp):\
+
+First create the recovery user (run as system for music_pdb):
+
+``` 
+CREATE USER music_owner_restored IDENTIFIED BY NewPassword
+  DEFAULT TABLESPACE music_ts
+  QUOTA UNLIMITED ON music_ts;
+GRANT CONNECT, RESOURCE TO music_owner_restored;
+```
+
+``` 
 docker exec -it musvinyl impdp system/DbForMusic_2025@localhost:1521/music_pdb DIRECTORY=DATA_PUMP_DIR DUMPFILE=music_schema.dmp REMAP_SCHEMA=music_owner:music_owner_restored
+```
+
+After this command (if successful) run:
+``` docker cp music_schema.dmp musvinyl:/opt/oracle/oradata/
+``` 
+
+You should see something like:
+"Successfully copied 784kB to musvinyl:/opt/oracle/oradata"
