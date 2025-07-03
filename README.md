@@ -108,7 +108,8 @@ docker exec -it musvinyl impdp system/DbForMusic_2025@localhost:1521/music_pdb D
 ```
 
 After this command (if successful) run:
-``` docker cp music_schema.dmp musvinyl:/opt/oracle/oradata/
+```
+docker cp music_schema.dmp musvinyl:/opt/oracle/oradata/
 ``` 
 
 You should see something like:
