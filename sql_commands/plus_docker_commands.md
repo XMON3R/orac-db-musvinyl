@@ -9,6 +9,8 @@ SCHEMAS=music_owner
 THEN:
 docker cp musvinyl:/opt/oracle/oradata/38E2896B62CD0534E063020011ACB54B/music_schema.dmp .
 
+!!!!!!!! EDIT according to use your hex (e.g. /opt/oracle/oradata/3902C3E72FEA00F9E063020011AC4B5A/music_schema.dmp)
+
 ## FOR IMPORT
 
 docker exec -it musvinyl impdp system/DbForMusic_2025@localhost:1521/music_pdb \
