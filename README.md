@@ -87,9 +87,14 @@ GRANT READ, WRITE ON DIRECTORY DATA_PUMP_DIR TO music_owner;
 as system (connected to "music_pdb)
 
 -   To Back Up (expdp):\
+-   ``` 
     docker exec -it musvinyl expdp music_owner/YourAppPassword@localhost:1521/music_pdb DIRECTORY=DATA_PUMP_DIR DUMPFILE=music_schema.dmp SCHEMAS=music_owner
+    ``` 
 
-& then: docker cp musvinyl:/opt/oracle/oradata/YOUR_HEX/music_schema.dmp .
+& then: 
+```
+docker cp musvinyl:/opt/oracle/oradata/YOUR_HEX/music_schema.dmp .
+``` 
 
 
 - To Recover (impdp):\
