@@ -46,10 +46,14 @@ CREATE SEQUENCE albums_seq START WITH 1 INCREMENT BY 1;
 CREATE TABLE albums (
     album_id NUMBER PRIMARY KEY,
     title VARCHAR2(200) NOT NULL,
+    album_type VARCHAR2(20) DEFAULT 'Studio' NOT NULL,
     primary_artist_id NUMBER NOT NULL,
     release_year NUMBER(4) NOT NULL,
     producer VARCHAR2(200),
-    CONSTRAINT fk_album_artist FOREIGN KEY (primary_artist_id) REFERENCES artists(artist_id)
+    CONSTRAINT fk_album_artist FOREIGN KEY (primary_artist_id) REFERENCES artists(artist_id),
+    
+    -- define the real-world key
+    CONSTRAINT uq_artist_album UNIQUE (primary_artist_id, title) 
 );
 
 CREATE SEQUENCE releases_seq START WITH 1 INCREMENT BY 1;
@@ -60,8 +64,11 @@ CREATE TABLE releases (
     release_date DATE,
     format VARCHAR2(50) NOT NULL,
     catalog_number VARCHAR2(100),
-    CONSTRAINT fk_release_album FOREIGN KEY (album_id) REFERENCES albums(album_id) ON DELETE CASCADE,
-    CONSTRAINT fk_release_label FOREIGN KEY (label_id) REFERENCES labels(label_id)
+    CONSTRAINT fk_release_album FOREIGN KEY (album_id) REFERENCES albums(album_id),
+    CONSTRAINT fk_release_label FOREIGN KEY (label_id) REFERENCES labels(label_id),
+
+    -- define the real-world key
+    CONSTRAINT uq_release_catalog UNIQUE (catalog_number)
 );
 
 CREATE SEQUENCE tracks_seq START WITH 1 INCREMENT BY 1;
@@ -71,7 +78,10 @@ CREATE TABLE tracks (
     title VARCHAR2(200) NOT NULL,
     track_number NUMBER,
     duration_seconds NUMBER,
-    CONSTRAINT fk_track_album FOREIGN KEY (album_id) REFERENCES albums(album_id) ON DELETE CASCADE
+    CONSTRAINT fk_track_album FOREIGN KEY (album_id) REFERENCES albums(album_id),
+
+    -- define the real-world key
+    CONSTRAINT uq_album_track UNIQUE (album_id, title)
 );
 
 CREATE TABLE track_features (
@@ -81,6 +91,8 @@ CREATE TABLE track_features (
     CONSTRAINT fk_tf_track FOREIGN KEY (track_id) REFERENCES tracks(track_id),
     CONSTRAINT fk_tf_artist FOREIGN KEY (guest_artist_id) REFERENCES artists(artist_id)
 );
+
+-- artists, members and labels have a unique constraint already
 
 -- -----------------------------------------------------------------
 -- Step 2: Create Indexes
@@ -96,6 +108,18 @@ CREATE INDEX idx_release_label_id ON releases(label_id);
 CREATE INDEX idx_track_album_id ON tracks(album_id);
 CREATE INDEX idx_tf_track_id ON track_features(track_id);
 CREATE INDEX idx_tf_guest_artist_id ON track_features(guest_artist_id);
+
+-- In the Indexes section
+
+-- New index for searching albums by year
+CREATE INDEX idx_albums_release_year ON albums(release_year);
+
+-- New index for searching releases by date
+CREATE INDEX idx_releases_release_date ON releases(release_date);
+
+-- "Find all albums for a specific artist within a certain time frame"
+-- The order (artist first, then year) is important for performance.
+CREATE INDEX idx_albums_artist_year ON albums(primary_artist_id, release_year);
 
 -- -----------------------------------------------------------------
 -- Step 3: Create Views
@@ -199,7 +223,7 @@ END album_pkg;
 /
 
 -- -----------------------------------------------------------------
--- Step 6: Create Package Bodies
+-- Step 6: Create Package Bodies (Corrected - No COMMIT/ROLLBACK)
 -- -----------------------------------------------------------------
 PROMPT -- Step 6: Creating Package Bodies...
 
@@ -207,11 +231,14 @@ CREATE OR REPLACE PACKAGE BODY artist_pkg AS
     PROCEDURE p_add_artist (pi_artist_name IN artists.artist_name%TYPE, pi_year_founded IN artists.year_founded%TYPE, pi_is_active IN artists.is_active%TYPE DEFAULT 'Y') AS
     BEGIN
         INSERT INTO artists (artist_id, artist_name, year_founded, is_active) VALUES (artists_seq.NEXTVAL, pi_artist_name, pi_year_founded, pi_is_active);
-        COMMIT;
         DBMS_OUTPUT.PUT_LINE('Success: Artist ' || pi_artist_name || ' added.');
     EXCEPTION
-        WHEN DUP_VAL_ON_INDEX THEN DBMS_OUTPUT.PUT_LINE('Error: Artist "' || pi_artist_name || '" already exists.'); ROLLBACK;
-        WHEN OTHERS THEN DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM); ROLLBACK;
+        WHEN DUP_VAL_ON_INDEX THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Artist "' || pi_artist_name || '" already exists.');
+            RAISE; -- Re-raise the exception to the caller
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in p_add_artist: ' || SQLERRM);
+            RAISE;
     END p_add_artist;
 
     PROCEDURE p_add_member_to_band (pi_artist_name IN artists.artist_name%TYPE, pi_member_full_name IN members.full_name%TYPE, pi_role IN artist_members.role%TYPE) AS
@@ -221,45 +248,38 @@ CREATE OR REPLACE PACKAGE BODY artist_pkg AS
         SELECT artist_id INTO v_artist_id FROM artists WHERE artist_name = pi_artist_name;
         SELECT member_id INTO v_member_id FROM members WHERE full_name = pi_member_full_name;
         INSERT INTO artist_members (artist_id, member_id, role) VALUES (v_artist_id, v_member_id, pi_role);
-        COMMIT;
         DBMS_OUTPUT.PUT_LINE('Success: ' || pi_member_full_name || ' added to ' || pi_artist_name);
     EXCEPTION
-        WHEN NO_DATA_FOUND THEN DBMS_OUTPUT.PUT_LINE('Error: Could not find artist "' || pi_artist_name || '" or member "' || pi_member_full_name || '".'); ROLLBACK;
-        WHEN DUP_VAL_ON_INDEX THEN DBMS_OUTPUT.PUT_LINE('Error: ' || pi_member_full_name || ' is already a member of ' || pi_artist_name || '.'); ROLLBACK;
-        WHEN OTHERS THEN DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM); ROLLBACK;
+        WHEN NO_DATA_FOUND THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Could not find artist "' || pi_artist_name || '" or member "' || pi_member_full_name || '".');
+            RAISE;
+        WHEN DUP_VAL_ON_INDEX THEN
+            DBMS_OUTPUT.PUT_LINE('Error: ' || pi_member_full_name || ' is already a member of ' || pi_artist_name || '.');
+            RAISE;
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in p_add_member_to_band: ' || SQLERRM);
+            RAISE;
     END p_add_member_to_band;
 
-    -- needed ?
     PROCEDURE p_delete_artist (pi_artist_name IN artists.artist_name%TYPE) AS
         v_artist_id   artists.artist_id%TYPE;
         v_album_count NUMBER;
     BEGIN
-        -- Find the artist's ID first
-        SELECT artist_id INTO v_artist_id
-        FROM artists WHERE artist_name = pi_artist_name;
-
-        -- Check for dependent albums BEFORE trying to delete
-        SELECT COUNT(*) INTO v_album_count
-        FROM albums WHERE primary_artist_id = v_artist_id;
+        SELECT artist_id INTO v_artist_id FROM artists WHERE artist_name = pi_artist_name;
+        SELECT COUNT(*) INTO v_album_count FROM albums WHERE primary_artist_id = v_artist_id;
 
         IF v_album_count > 0 THEN
-            -- If albums exist, now we can raise our custom error
             RAISE_APPLICATION_ERROR(-20001, 'Cannot delete artist: ' || pi_artist_name || ' still has ' || v_album_count || ' album(s) in the database.');
         ELSE
-            -- Only if no albums exist, do we delete the artist
             DELETE FROM artists WHERE artist_id = v_artist_id;
-            COMMIT;
         END IF;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
             DBMS_OUTPUT.PUT_LINE('Error: Artist "' || pi_artist_name || '" not found.');
-            ROLLBACK;
+            RAISE;
         WHEN OTHERS THEN
-            -- This will catch our custom RAISE_APPLICATION_ERROR and display it
-            ROLLBACK;
-            RAISE; -- Re-raise the exception so the client tool sees the error
+            RAISE;
     END p_delete_artist;
-
 END artist_pkg;
 /
 
@@ -269,11 +289,14 @@ CREATE OR REPLACE PACKAGE BODY album_pkg AS
     BEGIN
         SELECT artist_id INTO v_artist_id FROM artists WHERE artist_name = pi_artist_name;
         INSERT INTO albums (album_id, title, primary_artist_id, release_year, producer) VALUES (albums_seq.NEXTVAL, pi_album_title, v_artist_id, pi_release_year, pi_producer);
-        COMMIT;
         DBMS_OUTPUT.PUT_LINE('Success: Album "' || pi_album_title || '" added for artist ' || pi_artist_name || '.');
     EXCEPTION
-        WHEN NO_DATA_FOUND THEN DBMS_OUTPUT.PUT_LINE('Error: Artist "' || pi_artist_name || '" not found.'); ROLLBACK;
-        WHEN OTHERS THEN DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM); ROLLBACK;
+        WHEN NO_DATA_FOUND THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Artist "' || pi_artist_name || '" not found.');
+            RAISE;
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in p_add_album: ' || SQLERRM);
+            RAISE;
     END p_add_album;
 
     PROCEDURE p_add_release_to_album (pi_album_title IN albums.title%TYPE, pi_artist_name IN artists.artist_name%TYPE, pi_label_name IN labels.label_name%TYPE, pi_format IN releases.format%TYPE, pi_release_date IN releases.release_date%TYPE, pi_catalog_num IN releases.catalog_number%TYPE DEFAULT NULL) AS
@@ -283,11 +306,14 @@ CREATE OR REPLACE PACKAGE BODY album_pkg AS
         SELECT al.album_id INTO v_album_id FROM albums al JOIN artists a ON al.primary_artist_id = a.artist_id WHERE al.title = pi_album_title AND a.artist_name = pi_artist_name;
         SELECT label_id INTO v_label_id FROM labels WHERE label_name = pi_label_name;
         INSERT INTO releases (release_id, album_id, label_id, release_date, format, catalog_number) VALUES (releases_seq.NEXTVAL, v_album_id, v_label_id, pi_release_date, pi_format, pi_catalog_num);
-        COMMIT;
         DBMS_OUTPUT.PUT_LINE('Success: Added ' || pi_format || ' release for album "' || pi_album_title || '".');
     EXCEPTION
-        WHEN NO_DATA_FOUND THEN DBMS_OUTPUT.PUT_LINE('Error: Could not find album, artist, or label specified.'); ROLLBACK;
-        WHEN OTHERS THEN DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM); ROLLBACK;
+        WHEN NO_DATA_FOUND THEN
+            DBMS_OUTPUT.PUT_LINE('Error: Could not find album, artist, or label specified.');
+            RAISE;
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error in p_add_release_to_album: ' || SQLERRM);
+            RAISE;
     END p_add_release_to_album;
 END album_pkg;
 /
