@@ -80,8 +80,11 @@ CREATE TABLE tracks (
     duration_seconds NUMBER,
     CONSTRAINT fk_track_album FOREIGN KEY (album_id) REFERENCES albums(album_id),
 
-    -- define the real-world key
-    CONSTRAINT uq_album_track UNIQUE (album_id, title)
+    -- duplicate track names
+    CONSTRAINT uq_album_track_title UNIQUE (album_id, title),
+
+    -- duplicate track numbers
+    CONSTRAINT uq_album_track_number UNIQUE (album_id, track_number)
 );
 
 CREATE TABLE track_features (
